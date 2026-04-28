@@ -68,9 +68,6 @@ BridgeMapper is a powerful web application that helps NGOs and local social grou
 
 🔗 [GitHub Repository](https://github.com/SyedSaaduddin1101/Smart-Resource-Allocation)
 
----
-
----
 
 ## 🧑‍💻 Installation & Setup (Local Development)
 
