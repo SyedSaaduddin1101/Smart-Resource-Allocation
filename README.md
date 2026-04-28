@@ -1,20 +1,104 @@
-<<<<<<< HEAD
-# React + Vite
+# 🌉 BridgeMapper – Smart Resource Allocation for Social Impact
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+BridgeMapper is a powerful web application that helps NGOs and local social groups **collect scattered community data** (paper surveys, voice notes, text reports, CSV files) and **visualise urgent local needs** on a live heatmap. Volunteers can **match their skills** to tasks and accept missions in real time, creating an efficient, data‑driven volunteer coordination system.
 
-Currently, two official plugins are available:
+> 🏆 Built for the **Google Solutions Challenge 2026** – Problem Statement #5: Smart Resource Allocation.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## ✨ Key Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 📥 Multi‑Format Data Ingestion
+- **Paper surveys** – take a photo, Tesseract.js OCR extracts text.
+- **Voice reports** – speak directly into the browser (Web Speech API).
+- **Text reports** – manual field notes.
+- **CSV upload** – bulk import of records.
+- **Documents** – PDF, DOCX, TXT support.
 
-## Expanding the ESLint configuration
+### 🗺️ Live Urgency Map
+- **Coloured circles** – red (high urgency), orange (medium), green (low).
+- Real‑time updates – new tasks appear instantly.
+- **Skill‑based filtering** – volunteers only see tasks that match their expertise.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# Smart-Resource-Allocation
->>>>>>> 3ea2910c3fc95c5c5bf8b189eaf03bf809a476bf
+### 📊 Priority Queue
+- Ranked list of open tasks based on urgency.
+- One‑click acceptance.
+
+### 🎮 Gamification
+- **Points & badges** – volunteers earn points for completing tasks.
+- Badges: *Community Helper*, *Super Volunteer*, *Dedicated Hero*.
+
+### 👑 Admin Control Panel
+- **Task management** – change status (open/assigned/completed), delete tasks.
+- **Volunteer management** – update skills, view points.
+- **Create admin accounts** – no need to share personal emails.
+- **Impact dashboard** – live charts showing task completion and urgency distribution.
+
+### 💬 Real‑time Chat
+- Task‑specific chat between NGOs and volunteers (inside map popups).
+
+### 📱 Progressive Web App (PWA)
+- Installable on mobile/desktop, works offline, caches map tiles.
+
+### 🔐 Authentication
+- Google Sign‑In & Email/Password with email verification.
+- First‑user becomes admin automatically (or via “Make me Admin” button).
+
+---
+
+## 🛠️ Technology Stack
+
+| Area | Technologies |
+|------|--------------|
+| **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion, Leaflet (map) |
+| **Backend & DB** | Firebase (Authentication, Firestore, Hosting, Cloud Functions) |
+| **AI & Matching** | Vertex AI Gemini (optional), keyword‑based urgency detection |
+| **OCR** | Tesseract.js (client‑side, free) |
+| **Voice** | Web Speech API |
+| **Charts** | Chart.js |
+| **Icons** | Heroicons |
+| **Deployment** | GitHub Pages / Firebase Hosting |
+
+---
+
+## 🚀 Live Demo
+
+🔗 [https://bridgemapper-d0630.web.app](https://bridgemapper-d0630.web.app)  
+*(Firebase Hosting – replace with your actual URL)*
+
+🔗 [GitHub Repository](https://github.com/SyedSaaduddin1101/Smart-Resource-Allocation)
+
+---
+
+## 📸 Screenshots
+
+| Landing Page | Ingest Data | Heatmap | Priority Queue |
+|--------------|-------------|---------|----------------|
+| *(screenshot 1)* | *(screenshot 2)* | *(screenshot 3)* | *(screenshot 4)* |
+
+| Admin Dashboard | Manage Tasks | Impact Dashboard | Sidebar |
+|----------------|--------------|------------------|---------|
+| *(screenshot 5)* | *(screenshot 6)* | *(screenshot 7)* | *(screenshot 8)* |
+
+---
+
+## 🧑‍💻 Installation & Setup (Local Development)
+
+```bash
+# Clone the repository
+git clone https://github.com/SyedSaaduddin1101/Smart-Resource-Allocation.git
+cd Smart-Resource-Allocation
+
+# Install dependencies
+npm install
+
+# Create a .env file with your Firebase config (see .env.example)
+VITE_FIREBASE_API_KEY=your_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+
+# Start development server
+npm run dev
