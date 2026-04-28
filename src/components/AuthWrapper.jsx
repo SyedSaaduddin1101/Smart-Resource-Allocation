@@ -1,34 +1,22 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { 
   auth, 
-  signInWithGoogle, 
   signInWithEmail, 
   signUpWithEmail, 
   resetPassword, 
   resendVerificationEmail,
+  signInWithGoogle,
   logout, 
   db 
 } from '../firebase/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { useNotification } from '../context/NotificationContext';
 
 const AppContext = createContext();
 export const useApp = () => useContext(AppContext);
 
-const getFriendlyErrorMessage = (errorCode) => {
-  const errors = {
-    'auth/invalid-credential': 'Invalid credentials. Please check your email and password.',
-    'auth/wrong-password': 'Invalid credentials. Please check your email and password.',
-    'auth/user-not-found': 'Invalid credentials. Please check your email and password.',
-    'auth/email-already-in-use': 'This email is already registered. Please sign in instead.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
-    'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/internal-error': 'Something went wrong. Please try again.',
-  };
-  return errors[errorCode] || 'An error occurred. Please try again.';
-};
-
-export default function AuthWrapper({ children }) {
+export default function AuthWrapper({ children, onGoToLanding }) {
+  const { showNotification } = useNotification();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
@@ -46,6 +34,18 @@ export default function AuthWrapper({ children }) {
   const [badges, setBadges] = useState([]);
   const [userSkill, setUserSkill] = useState('general');
   const [profileSidebarOpen, setProfileSidebarOpen] = useState(false);
+  const [noAdminExists, setNoAdminExists] = useState(false);
+  const [becomingAdmin, setBecomingAdmin] = useState(false);
+
+  // Check if any admin exists
+  useEffect(() => {
+    const checkAdminExists = async () => {
+      const q = query(collection(db, 'users'), where('isAdmin', '==', true));
+      const snap = await getDocs(q);
+      setNoAdminExists(snap.empty);
+    };
+    checkAdminExists();
+  }, []);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (firebaseUser) => {
@@ -58,11 +58,14 @@ export default function AuthWrapper({ children }) {
           setLoading(false);
           return;
         }
-        const adminEmails = ['admin@bridgemapper.com', 'your-email@gmail.com'];
-        setIsAdmin(adminEmails.includes(firebaseUser.email));
-        
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+        let isUserAdmin = false;
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        if (idTokenResult.claims.admin) isUserAdmin = true;
+        if (snap.exists() && snap.data().isAdmin) isUserAdmin = true;
+        setIsAdmin(isUserAdmin);
+        
         if (snap.exists()) {
           setPoints(snap.data().points || 0);
           setBadges(snap.data().badges || []);
@@ -70,11 +73,11 @@ export default function AuthWrapper({ children }) {
         } else {
           await setDoc(userRef, {
             email: firebaseUser.email,
-            name: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
+            name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
             points: 0,
             badges: [],
             skill: 'general',
+            isAdmin: isUserAdmin,
             createdAt: new Date()
           });
         }
@@ -107,7 +110,7 @@ export default function AuthWrapper({ children }) {
         if (!cred.user.emailVerified) {
           setPendingUser(cred.user);
           setNeedsVerification(true);
-          setError('Please verify your email first.');
+          showNotification('Please verify your email first.', 'error');
           await auth.signOut();
         }
       } else {
@@ -115,10 +118,11 @@ export default function AuthWrapper({ children }) {
         const cred = await signUpWithEmail(email, password, name);
         setPendingUser(cred.user);
         setNeedsVerification(true);
-        setError('Verification email sent! Please check your inbox.');
+        showNotification('Verification email sent! Please check your inbox.', 'success');
       }
     } catch (err) {
-      setError(getFriendlyErrorMessage(err.code));
+      setError(err.message);
+      showNotification(err.message, 'error');
     }
     setAuthLoading(false);
   };
@@ -130,8 +134,10 @@ export default function AuthWrapper({ children }) {
       await resetPassword(email);
       setResetSent(true);
       setError('');
-    } catch (err) {
-      setError(getFriendlyErrorMessage(err.code));
+      showNotification('Password reset email sent.', 'success');
+    } catch (err) { 
+      setError(err.message);
+      showNotification(err.message, 'error');
     }
     setAuthLoading(false);
   };
@@ -142,10 +148,31 @@ export default function AuthWrapper({ children }) {
     try {
       await resendVerificationEmail(pendingUser);
       setVerificationMsg('Verification email resent!');
-    } catch (err) {
-      setError(getFriendlyErrorMessage(err.code));
+      showNotification('Verification email resent!', 'success');
+    } catch (err) { 
+      setError(err.message);
+      showNotification(err.message, 'error');
     }
     setAuthLoading(false);
+  };
+
+  const becomeFirstAdmin = async () => {
+    setBecomingAdmin(true);
+    setError('');
+    try {
+      if (user) {
+        await setDoc(doc(db, 'users', user.uid), { isAdmin: true }, { merge: true });
+        await user.getIdToken(true);
+        showNotification('You are now the first admin! Refresh the page.', 'success');
+        window.location.reload();
+      } else {
+        showNotification('You must be logged in first', 'error');
+      }
+    } catch (err) {
+      setError(err.message);
+      showNotification(err.message, 'error');
+    }
+    setBecomingAdmin(false);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
@@ -187,7 +214,26 @@ export default function AuthWrapper({ children }) {
             {isLogin && !resetSent && <button onClick={handleReset} className="block mt-2 text-white/60 text-sm">Forgot password?</button>}
             {resetSent && <button onClick={() => setResetSent(false)} className="text-white/80 underline mt-2">Back to sign in</button>}
           </div>
-          <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/30"></div></div><div className="relative flex justify-center text-sm"><span className="px-3 bg-transparent text-white/70">OR</span></div></div>
+          {noAdminExists && (
+            <div className="mt-4 pt-2 border-t border-white/20">
+              <button
+                onClick={becomeFirstAdmin}
+                disabled={becomingAdmin}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 rounded-xl transition"
+              >
+                {becomingAdmin ? 'Processing...' : '👑 Become First Admin (No admin exists yet)'}
+              </button>
+              <p className="text-xs text-white/50 text-center mt-2">No admin account found. You can become the first admin.</p>
+            </div>
+          )}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/30"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-3 bg-transparent text-white/70">OR</span>
+            </div>
+          </div>
           <button onClick={signInWithGoogle} className="w-full bg-white/10 border border-white/30 hover:bg-white/20 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-3 transition-all">
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
             Sign in with Google
@@ -197,7 +243,7 @@ export default function AuthWrapper({ children }) {
     );
   }
 
-  const appContextValue = {
+  const contextValue = {
     isAdmin,
     profileSidebarOpen,
     setProfileSidebarOpen,
@@ -209,24 +255,30 @@ export default function AuthWrapper({ children }) {
   };
 
   return (
-    <AppContext.Provider value={appContextValue}>
+    <AppContext.Provider value={contextValue}>
       <div className="min-h-screen">
         <div className="glass-card rounded-none sticky top-0 z-50 px-6 py-3 flex justify-between items-center flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <button onClick={() => setProfileSidebarOpen(!profileSidebarOpen)} className="text-white text-2xl focus:outline-none">☰</button>
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><span className="text-white text-sm">BM</span></div>
-            <span className="font-bold text-xl text-white">BridgeMapper</span>
+            <div onClick={onGoToLanding} className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center cursor-pointer hover:bg-white/30 transition">
+              <span className="text-white text-sm">BM</span>
+            </div>
+            <span onClick={onGoToLanding} className="font-bold text-xl text-white cursor-pointer hover:text-purple-200 transition">BridgeMapper</span>
             <div className="flex items-center gap-2 ml-4 bg-white/10 rounded-full px-3 py-1">
               <span className="text-white text-sm">⭐ {points}</span>
               {badges.map(b => <span key={b} title={b} className="text-sm">🏅</span>)}
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <select value={userSkill} onChange={e => updateSkill(e.target.value)} className="bg-white/20 text-white rounded-full px-3 py-1 text-sm">
-              <option value="general" className="bg-gray-800 text-white">General</option>
-              <option value="medical" className="bg-gray-800 text-white">Medical</option>
-              <option value="food" className="bg-gray-800 text-white">Food</option>
-              <option value="logistics" className="bg-gray-800 text-white">Logistics</option>
+            <select
+              value={userSkill}
+              onChange={e => updateSkill(e.target.value)}
+              className="bg-white text-gray-800 border border-gray-300 rounded-full px-3 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="general">General</option>
+              <option value="medical">Medical</option>
+              <option value="food">Food</option>
+              <option value="logistics">Logistics</option>
             </select>
             {user.photoURL && <img src={user.photoURL} alt="profile" className="w-8 h-8 rounded-full border border-white/30" onError={(e) => e.target.style.display = 'none'} />}
             <span className="text-sm text-white/80 hidden sm:inline">{user.displayName || user.email}</span>

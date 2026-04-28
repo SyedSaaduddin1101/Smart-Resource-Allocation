@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../firebase/firebase';
 import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { useNotification } from '../context/NotificationContext';
 
 export default function AdminDashboard() {
+  const { showNotification } = useNotification();
   const [tasks, setTasks] = useState([]);
   const [volunteers, setVolunteers] = useState([]);
   const [stats, setStats] = useState({ total: 0, completed: 0, open: 0, assigned: 0 });
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState('stats');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,6 +32,7 @@ export default function AdminDashboard() {
 
   const updateTaskStatus = async (taskId, newStatus) => {
     await updateDoc(doc(db, 'tasks', taskId), { status: newStatus });
+    // Refresh data
     const tasksSnap = await getDocs(collection(db, 'tasks'));
     const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     setTasks(allTasks);
@@ -39,42 +42,51 @@ export default function AdminDashboard() {
       open: allTasks.filter(t => t.status === 'open').length,
       assigned: allTasks.filter(t => t.status === 'assigned').length,
     });
+    showNotification('Task status updated', 'success');
   };
 
   const deleteTask = async (taskId) => {
-    if (confirm('Delete this task?')) {
+    if (window.confirm('Delete this task? This action cannot be undone.')) {
       await deleteDoc(doc(db, 'tasks', taskId));
       setTasks(tasks.filter(t => t.id !== taskId));
+      showNotification('Task deleted', 'success');
     }
   };
 
   const updateVolunteerSkill = async (volunteerId, newSkill) => {
     await updateDoc(doc(db, 'users', volunteerId), { skill: newSkill });
     setVolunteers(volunteers.map(v => v.id === volunteerId ? { ...v, skill: newSkill } : v));
+    showNotification('Volunteer skill updated', 'success');
   };
 
-  if (loading) return <div className="glass-card p-8 text-center"><div className="spinner mx-auto"></div><p className="text-white mt-4">Loading admin data...</p></div>;
-
   const filteredTasks = tasks.filter(t => filter === 'all' ? true : t.status === filter);
+
+  if (loading) return <div className="glass-card p-8 text-center"><div className="spinner mx-auto"></div><p className="text-white mt-4">Loading admin dashboard...</p></div>;
 
   return (
     <div className="glass-card p-6">
       <h2 className="text-2xl font-bold text-white mb-4">🛡️ Admin Control Panel</h2>
-      <div className="flex gap-2 mb-4 border-b border-white/20 pb-2">
-        <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 rounded-lg ${activeTab === 'tasks' ? 'bg-purple-600 text-white' : 'text-white/80 hover:text-white'}`}>Tasks</button>
-        <button onClick={() => setActiveTab('volunteers')} className={`px-4 py-2 rounded-lg ${activeTab === 'volunteers' ? 'bg-purple-600 text-white' : 'text-white/80 hover:text-white'}`}>Volunteers</button>
+      <div className="flex gap-2 mb-4 border-b border-white/20 pb-2 flex-wrap">
+        <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-lg ${activeTab === 'stats' ? 'bg-purple-600 text-white' : 'text-white/80 hover:text-white'}`}>Overview</button>
+        <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 rounded-lg ${activeTab === 'tasks' ? 'bg-purple-600 text-white' : 'text-white/80 hover:text-white'}`}>Manage Tasks</button>
+        <button onClick={() => setActiveTab('volunteers')} className={`px-4 py-2 rounded-lg ${activeTab === 'volunteers' ? 'bg-purple-600 text-white' : 'text-white/80 hover:text-white'}`}>Manage Volunteers</button>
       </div>
+
+      {activeTab === 'stats' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-white">{stats.total}</div><div className="text-white/70">Total Tasks</div></div>
+          <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-green-300">{stats.completed}</div><div className="text-white/70">Completed</div></div>
+          <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-yellow-300">{stats.open}</div><div className="text-white/70">Open</div></div>
+          <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-blue-300">{stats.assigned}</div><div className="text-white/70">Assigned</div></div>
+        </div>
+      )}
 
       {activeTab === 'tasks' && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-white">{stats.total}</div><div className="text-white/70">Total</div></div>
-            <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-green-300">{stats.completed}</div><div className="text-white/70">Completed</div></div>
-            <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-yellow-300">{stats.open}</div><div className="text-white/70">Open</div></div>
-            <div className="bg-white/10 p-3 rounded-lg text-center"><div className="text-2xl font-bold text-blue-300">{stats.assigned}</div><div className="text-white/70">Assigned</div></div>
-          </div>
           <div className="flex gap-2 mb-4 flex-wrap">
-            {['all','open','assigned','completed'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-full ${filter === f ? 'bg-purple-600 text-white' : 'bg-white/20 text-white/80'}`}>{f.toUpperCase()}</button>)}
+            {['all','open','assigned','completed'].map(f => (
+              <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-full ${filter === f ? 'bg-purple-600 text-white' : 'bg-white/20 text-white/80'}`}>{f.toUpperCase()}</button>
+            ))}
           </div>
           <div className="max-h-96 overflow-y-auto space-y-2 custom-scroll">
             {filteredTasks.map(task => (

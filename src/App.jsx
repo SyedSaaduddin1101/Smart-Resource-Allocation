@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import AuthWrapper, { useApp } from './components/AuthWrapper';
+import LandingPage from './components/LandingPage';
 import IngestionCenter from './components/IngestionCenter';
 import HeatmapMap from './components/HeatmapMap';
 import PriorityQueue from './components/PriorityQueue';
@@ -18,18 +19,17 @@ function AppContent() {
 
   const openAssignModal = (taskId) => setAssignModalTaskId(taskId);
   const closeAssignModal = () => setAssignModalTaskId(null);
-  const refreshTasks = () => { /* optionally refresh */ };
 
   const renderContent = () => {
     switch(activeTab) {
       case 'ingest': return <IngestionCenter />;
       case 'heatmap': return <HeatmapMap />;
       case 'priority': return <PriorityQueue />;
-      case 'admin': return isAdmin ? <AdminDashboard /> : <div className="text-center text-white p-10">Access Denied</div>;
+      case 'admin': return <AdminDashboard />;
       case 'impact': return <ImpactDashboard />;
       case 'organizer': return <DataOrganizer />;
-      case 'manageTasks': return isAdmin ? <ManageTasks openAssignModal={openAssignModal} /> : <div>Access Denied</div>;
-      case 'manageVolunteers': return isAdmin ? <ManageVolunteers /> : <div>Access Denied</div>;
+      case 'manageTasks': return <ManageTasks />;
+      case 'manageVolunteers': return <ManageVolunteers />;
       default: return <IngestionCenter />;
     }
   };
@@ -41,20 +41,18 @@ function AppContent() {
         onClose={() => setProfileSidebarOpen(false)} 
         user={user} 
         isAdmin={isAdmin} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={setActiveTab}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Tab buttons remain same as before, but we also show new tabs for admin */}
         <div className="flex flex-wrap gap-2 mb-8 border-b border-white/20 pb-2">
-          {/* existing buttons */}
           <button onClick={() => setActiveTab('ingest')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'ingest' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Ingest Data</button>
           <button onClick={() => setActiveTab('heatmap')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'heatmap' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Heatmap</button>
           <button onClick={() => setActiveTab('priority')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'priority' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Priority Queue</button>
           <button onClick={() => setActiveTab('impact')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'impact' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Impact Dashboard</button>
           <button onClick={() => setActiveTab('organizer')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'organizer' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Data Organizer</button>
+          <button onClick={() => setActiveTab('admin')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'admin' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Admin Dashboard</button>
           {isAdmin && (
             <>
-              <button onClick={() => setActiveTab('admin')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'admin' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Admin Panel</button>
               <button onClick={() => setActiveTab('manageTasks')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'manageTasks' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Manage Tasks</button>
               <button onClick={() => setActiveTab('manageVolunteers')} className={`px-5 py-2.5 rounded-full font-medium ${activeTab === 'manageVolunteers' ? 'bg-white/20 text-white shadow-lg' : 'text-white/70 hover:text-white'}`}>Manage Volunteers</button>
             </>
@@ -64,14 +62,22 @@ function AppContent() {
           {renderContent()}
         </div>
       </div>
-      {assignModalTaskId && <AssignTaskModal taskId={assignModalTaskId} onClose={closeAssignModal} onAssigned={refreshTasks} />}
+      {assignModalTaskId && <AssignTaskModal taskId={assignModalTaskId} onClose={closeAssignModal} onAssigned={() => {}} />}
     </>
   );
 }
 
 function App() {
+  const [showLanding, setShowLanding] = useState(true);
+
+  const goToLanding = () => setShowLanding(true);
+
+  if (showLanding) {
+    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+  }
+
   return (
-    <AuthWrapper>
+    <AuthWrapper onGoToLanding={goToLanding}>
       <AppContent />
     </AuthWrapper>
   );

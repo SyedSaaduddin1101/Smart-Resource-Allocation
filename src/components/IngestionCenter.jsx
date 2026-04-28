@@ -3,8 +3,10 @@ import { createWorker } from 'tesseract.js';
 import { db, auth } from '../firebase/firebase';
 import { collection, addDoc, GeoPoint } from 'firebase/firestore';
 import Papa from 'papaparse';
+import { useNotification } from '../context/NotificationContext';
 
 export default function IngestionCenter() {
+  const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState('manual');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
@@ -19,21 +21,33 @@ export default function IngestionCenter() {
 
   const startVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert('Speech not supported');
-    const rec = new SpeechRecognition();
-    rec.lang = 'en-US';
-    rec.onresult = (e) => {
-      setVoiceText(e.results[0][0].transcript);
-      detectUrgency(e.results[0][0].transcript);
+    if (!SpeechRecognition) {
+      showNotification('Voice recognition not supported in this browser', 'error');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setVoiceText(transcript);
+      detectUrgency(transcript);
     };
-    rec.start();
+    recognition.onerror = () => showNotification('Voice recognition error', 'error');
+    recognition.start();
   };
 
   const detectUrgency = (text) => {
     const lower = text.toLowerCase();
-    if (lower.includes('urgent') || lower.includes('emergency')) setUrgency('high');
-    else if (lower.includes('low') || lower.includes('minor')) setUrgency('low');
-    else setUrgency('medium');
+    let score = 0;
+    if (lower.includes('urgent')) score += 30;
+    if (lower.includes('emergency')) score += 40;
+    if (lower.includes('critical')) score += 50;
+    if (lower.includes('medical')) score += 20;
+    if (lower.includes('food')) score += 15;
+    if (lower.includes('water')) score += 25;
+    if (score >= 40) setUrgency('high');
+    else if (score >= 20) setUrgency('medium');
+    else setUrgency('low');
   };
 
   const handleImageUpload = (e) => {
@@ -54,13 +68,19 @@ export default function IngestionCenter() {
       await worker.terminate();
       setExtractedText(text);
       detectUrgency(text);
-    } catch (err) { alert('OCR failed'); }
+      showNotification('Text extracted successfully', 'success');
+    } catch (err) {
+      showNotification('OCR failed. Try a clearer image.', 'error');
+    }
     setLoadingOCR(false);
   };
 
   const handleCSV = (e) => {
     const file = e.target.files[0];
-    Papa.parse(file, { header: true, complete: (res) => setCsvData(res.data) });
+    Papa.parse(file, { header: true, complete: (res) => {
+      setCsvData(res.data);
+      showNotification(`Loaded ${res.data.length} records from CSV`, 'success');
+    }});
   };
 
   const handleDocument = async (e) => {
@@ -72,7 +92,6 @@ export default function IngestionCenter() {
       if (file.type === 'text/plain') {
         text = await file.text();
       } else if (file.type === 'application/pdf') {
-        // Dynamically import pdf-parse to avoid bundling issues
         const pdfParse = (await import('pdf-parse')).default;
         const arrayBuffer = await file.arrayBuffer();
         const pdfData = await pdfParse(arrayBuffer);
@@ -83,19 +102,19 @@ export default function IngestionCenter() {
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
       } else {
-        alert('Unsupported file. Use PDF, DOCX, or TXT.');
+        showNotification('Unsupported file. Use PDF, DOCX, or TXT.', 'error');
         setLoadingOCR(false);
         return;
       }
       if (text.trim()) {
         setExtractedText(text.slice(0, 5000));
         detectUrgency(text);
+        showNotification('Document text extracted', 'success');
       } else {
-        alert('No text found in file');
+        showNotification('No text found in file', 'error');
       }
     } catch (err) {
-      console.error(err);
-      alert('Error reading file');
+      showNotification('Error reading file: ' + err.message, 'error');
     }
     setLoadingOCR(false);
   };
@@ -111,18 +130,31 @@ export default function IngestionCenter() {
   const getLocation = () => {
     setLocation(prev => ({ ...prev, loading: true, error: null }));
     if (!navigator.geolocation) {
-      setLocation(prev => ({ ...prev, error: 'Geolocation not supported', loading: false }));
+      const msg = 'Geolocation not supported';
+      setLocation(prev => ({ ...prev, error: msg, loading: false }));
+      showNotification(msg, 'error');
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, error: null, loading: false }),
-      (err) => {
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          error: null,
+          loading: false
+        });
+        showNotification('Location updated', 'success');
+      },
+      (error) => {
         let msg = 'Location failed: ';
-        if (err.code === 1) msg += 'Permission denied';
-        else if (err.code === 2) msg += 'Position unavailable';
-        else msg += err.message;
+        switch(error.code) {
+          case error.PERMISSION_DENIED: msg += 'Permission denied'; break;
+          case error.POSITION_UNAVAILABLE: msg += 'Position unavailable'; break;
+          case error.TIMEOUT: msg += 'Request timed out'; break;
+          default: msg += error.message;
+        }
         setLocation(prev => ({ ...prev, error: msg, loading: false }));
-        alert(msg);
+        showNotification(msg, 'error');
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -135,29 +167,36 @@ export default function IngestionCenter() {
     else if (activeTab === 'voice') finalText = voiceText;
     else if (activeTab === 'csv' && csvData.length) finalText = `CSV Import: ${csvData.length} records`;
     else if (activeTab === 'document') finalText = extractedText;
-    if (!finalText) return alert('No data to save');
+    if (!finalText) {
+      showNotification('No data to save', 'error');
+      return;
+    }
 
     const useLat = location.lat ?? 37.7749;
     const useLng = location.lng ?? -122.4194;
 
     setSaving(true);
     const skill = detectSkill(finalText);
-    await addDoc(collection(db, 'tasks'), {
-      description: finalText.slice(0, 500),
-      urgency,
-      requiredSkill: skill,
-      location: new GeoPoint(useLat, useLng),
-      status: 'open',
-      createdAt: new Date(),
-      createdBy: auth.currentUser?.uid,
-    });
-    alert('Task saved!');
-    setDescription('');
-    setImage(null);
-    setExtractedText('');
-    setVoiceText('');
-    setCsvData([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    try {
+      await addDoc(collection(db, 'tasks'), {
+        description: finalText.slice(0, 500),
+        urgency,
+        requiredSkill: skill,
+        location: new GeoPoint(useLat, useLng),
+        status: 'open',
+        createdAt: new Date(),
+        createdBy: auth.currentUser?.uid,
+      });
+      showNotification('Task saved successfully!', 'success');
+      setDescription('');
+      setImage(null);
+      setExtractedText('');
+      setVoiceText('');
+      setCsvData([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      showNotification('Error saving: ' + err.message, 'error');
+    }
     setSaving(false);
   };
 
@@ -219,10 +258,15 @@ export default function IngestionCenter() {
 
         <div className="flex items-center gap-3">
           <span className="text-white font-medium">Urgency:</span>
-          <select value={urgency} onChange={e => setUrgency(e.target.value)} className="bg-white/10 border border-white/20 rounded-lg p-2 text-white">
-            <option value="high" className="text-black">High</option>
-            <option value="medium" className="text-black">Medium</option>
-            <option value="low" className="text-black">Low</option>
+          {/* FIXED DROPDOWN: white background, dark text, visible options */}
+          <select
+            value={urgency}
+            onChange={e => setUrgency(e.target.value)}
+            className="bg-white text-gray-800 border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="high">🔴 High</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="low">🟢 Low</option>
           </select>
         </div>
 

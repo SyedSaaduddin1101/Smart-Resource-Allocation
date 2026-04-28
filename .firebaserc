@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "bridgemapper-d0630",
+    "bridge-mapper": "bridgemapper-d0630"
+  },
+  "targets": {},
+  "etags": {}
+}
