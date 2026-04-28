@@ -70,16 +70,6 @@ BridgeMapper is a powerful web application that helps NGOs and local social grou
 
 ---
 
-## 📸 Screenshots
-
-| Landing Page | Ingest Data | Heatmap | Priority Queue |
-|--------------|-------------|---------|----------------|
-| *(screenshot 1)* | *(screenshot 2)* | *(screenshot 3)* | *(screenshot 4)* |
-
-| Admin Dashboard | Manage Tasks | Impact Dashboard | Sidebar |
-|----------------|--------------|------------------|---------|
-| *(screenshot 5)* | *(screenshot 6)* | *(screenshot 7)* | *(screenshot 8)* |
-
 ---
 
 ## 🧑‍💻 Installation & Setup (Local Development)
