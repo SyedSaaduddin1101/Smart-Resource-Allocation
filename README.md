@@ -69,22 +69,7 @@ BridgeMapper is a powerful web application that helps NGOs and local social grou
 🔗 [GitHub Repository](https://github.com/SyedSaaduddin1101/Smart-Resource-Allocation)
 
 
-## 🧑‍💻 Installation & Setup (Local Development)
 
-```bash
-# Clone the repository
-git clone https://github.com/SyedSaaduddin1101/Smart-Resource-Allocation.git
-cd Smart-Resource-Allocation
-
-# Install dependencies
-npm install
-
-# Create a .env file with your Firebase config (see .env.example)
-VITE_FIREBASE_API_KEY=your_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 
 # Start development server
